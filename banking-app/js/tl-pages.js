@@ -717,6 +717,7 @@ const TLPages = {
           <div class="search-bar" style="margin-bottom:4px">
             <div class="search-input-wrap"><div class="input-icon-wrap"><i class="input-icon fa-solid fa-magnifying-glass"></i><input class="form-control" placeholder="Search advisors…"></div></div>
             <select class="form-control" style="width:160px"><option>All specialties</option><option>Retail Banking</option><option>Investments</option><option>Mortgages</option></select>
+            <button class="btn btn-secondary btn-sm" onclick="App.showAccessibilityModal()"><i class="fa-solid fa-universal-access"></i> Accessibility</button>
           </div>
 
           <div class="card">
@@ -771,6 +772,7 @@ const TLPages = {
                 <div style="display:flex;gap:8px;margin-top:12px">
                   <button class="btn btn-secondary btn-sm" style="flex:1" onclick="App.navigate('tl-messages')"><i class="fa-solid fa-message"></i></button>
                   <button class="btn btn-primary btn-sm" style="flex:1" onclick="TLPages.viewFADetail('${f.id}')"><i class="fa-solid fa-eye"></i> View</button>
+                  <button class="btn btn-ghost btn-sm" style="color:var(--danger)" title="Remove advisor" onclick="TLPages.deleteFA('${f.id}')"><i class="fa-solid fa-trash"></i></button>
                 </div>
               </div>`;
             }).join('')}
@@ -839,6 +841,7 @@ const TLPages = {
           <div style="display:flex;gap:8px">
             <button class="btn btn-primary" style="flex:1" onclick="TLPages.assignCaseModal();App.closeModal()"><i class="fa-solid fa-plus"></i> Assign Case</button>
             <button class="btn btn-secondary" style="flex:1" onclick="App.navigate('tl-messages');App.closeModal()"><i class="fa-solid fa-message"></i> Message</button>
+            <button class="btn btn-danger btn-sm" onclick="App.closeModal();TLPages.deleteFA('${id}')"><i class="fa-solid fa-trash"></i></button>
           </div>
         </div>
       </div>`);
@@ -942,5 +945,35 @@ const TLPages = {
     body?.appendChild(wrap);
     input.value = '';
     body.scrollTop = body.scrollHeight;
+  },
+
+  deleteFA(id) {
+    const f = Data.users.find(x=>x.id===id);
+    if (!f) return;
+    const clients = Data.users.filter(x=>x.role==='customer'&&x.faId===id);
+    App.openModal(`
+      <div class="modal">
+        <div class="modal-header">
+          <div class="modal-title"><i class="fa-solid fa-trash" style="color:var(--danger);margin-right:8px"></i>Remove Financial Advisor</div>
+          <button class="modal-close" id="modal-close-btn"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="modal-body">
+          <div class="modal-icon-wrap">
+            <div class="modal-icon danger"><i class="fa-solid fa-user-minus"></i></div>
+            <div class="modal-confirm-text">Remove <strong>${f.name}</strong> from the team? This action cannot be undone.</div>
+          </div>
+          ${clients.length ? `<div class="alert alert-warning"><i class="fa-solid fa-triangle-exclamation"></i><div class="alert-body">${clients.length} client(s) currently assigned to this advisor will need to be reassigned.</div></div>` : ''}
+          <div class="form-group"><label class="form-label">Reason for removal</label><textarea class="form-control" rows="2" id="delete-fa-reason" placeholder="e.g. Resigned, performance review…"></textarea></div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" id="modal-cancel-btn">Cancel</button>
+          <button class="btn btn-danger" id="modal-confirm-btn"><i class="fa-solid fa-trash"></i> Remove Advisor</button>
+        </div>
+      </div>`, () => {
+        const idx = Data.users.findIndex(x=>x.id===id);
+        if (idx > -1) Data.users.splice(idx, 1);
+        App.toast(`${f.name} has been removed from the team`, 'warning');
+        App.navigate('tl-fa-profiles');
+      });
   },
 };

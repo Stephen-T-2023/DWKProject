@@ -117,9 +117,14 @@ const CustomerPages = {
         <div class="account-card ${a.color}" onclick="App.navigate('customer-statement')">
           ${a.frozen?'<div class="account-card-badge"><i class="fa-solid fa-snowflake"></i> Frozen</div>':''}
           <div><div class="account-card-type">${a.type}</div></div>
-          <div>
-            <div class="account-card-balance${App.state.privacyMode?' blurred':''}">${App.fmt.currency(a.balance)}</div>
-            <div class="account-card-number">${a.iban.slice(-9)}</div>
+          <div style="display:flex;align-items:flex-end;justify-content:space-between">
+            <div>
+              <div class="account-card-balance${(App.state.privacyMode||App.state.hiddenBalances.includes(a.id))?' blurred':''}" id="balance-${a.id}" data-account-id="${a.id}">${App.fmt.currency(a.balance)}</div>
+              <div class="account-card-number">${a.iban.slice(-9)}</div>
+            </div>
+            <button class="account-balance-toggle${App.state.hiddenBalances.includes(a.id)?' hidden-balance':''}" id="acc-eye-${a.id}" title="${App.state.hiddenBalances.includes(a.id)?'Show balance':'Hide balance'}" onclick="App.toggleAccountBalance('${a.id}',event)">
+              <i class="fa-solid ${App.state.hiddenBalances.includes(a.id)?'fa-eye-slash':'fa-eye'}"></i>
+            </button>
           </div>
         </div>`).join('')}
       </div>
@@ -265,7 +270,22 @@ const CustomerPages = {
       activity:  () => CustomerPages._renderActivity(txs, cfg),
       extras:    () => CustomerPages._renderExtras(cfg),
     };
-    const sections = cfg.sectionOrder.map(id => sectionMap[id] ? sectionMap[id]() : '').join('');
+    const sectionLabels = { kpi:'Summary Cards', charts:'Charts', accounts:'Accounts', activity:'Recent Activity', extras:'Extras' };
+    const sections = cfg.sectionOrder.map(id => {
+      if (!sectionMap[id]) return '';
+      return `<div class="dash-section-wrap" draggable="true" data-section="${id}"
+        ondragstart="CustomerPages._dashDragStart(event,'${id}')"
+        ondragover="CustomerPages._dashDragOver(event,'${id}')"
+        ondragleave="CustomerPages._dashDragLeave(event)"
+        ondrop="CustomerPages._dashDrop(event,'${id}')"
+        ondragend="CustomerPages._dashDragEnd(event)">
+        <div class="dash-section-handle" title="Drag to reorder">
+          <span><i class="fa-solid fa-grip-vertical" style="margin-right:5px;font-size:10px"></i>${sectionLabels[id]||id}</span>
+          <i class="fa-solid fa-grip-horizontal" style="font-size:11px"></i>
+        </div>
+        ${sectionMap[id]()}
+      </div>`;
+    }).join('');
 
     return `
     <div class="app-layout">
@@ -277,7 +297,7 @@ const CustomerPages = {
           ${accs.some(a=>a.frozen) ? `<div class="frozen-banner"><i class="fa-solid fa-snowflake"></i><div><h4>Account Frozen</h4><p>One or more accounts are frozen. Go to Settings to manage.</p></div></div>` : ''}
 
           <div style="display:flex;align-items:center;justify-content:space-between;background:var(--surface);border:1px solid var(--border-light);border-radius:var(--radius-sm);padding:10px 16px;box-shadow:var(--shadow-xs)">
-            <div style="font-size:13px;color:var(--text-muted)"><i class="fa-solid fa-grip" style="margin-right:6px"></i>Customise your dashboard layout</div>
+            <div style="font-size:13px;color:var(--text-muted)"><i class="fa-solid fa-arrows-up-down" style="margin-right:6px"></i>Drag sections below to reorder your dashboard</div>
             <button class="btn btn-primary btn-sm" onclick="CustomerPages.showCustomizePanel()">
               <i class="fa-solid fa-sliders"></i> Customise Widgets
             </button>
@@ -319,42 +339,9 @@ const CustomerPages = {
 
   // ===== CUSTOMISE PANEL =====
   showCustomizePanel() {
-    const cfg = JSON.parse(JSON.stringify(CustomerPages.getConfig())); // deep copy
-    const sectionMeta = {
-      kpi:      { icon:'fa-gauge', label:'Summary Cards', color:'#3B82F6' },
-      charts:   { icon:'fa-chart-bar', label:'Charts', color:'#8B5CF6' },
-      accounts: { icon:'fa-credit-card', label:'My Accounts', color:'#22C55E' },
-      activity: { icon:'fa-list', label:'Activity Row', color:'#F59E0B' },
-      extras:   { icon:'fa-star', label:'Extra Widgets', color:'#EF4444' },
-    };
-
-    const renderRow = (id, idx, total) => {
-      const m = sectionMeta[id];
-      const sec = cfg[id];
-      return `
-      <div class="wc-section-row" id="wc-row-${id}" style="background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:14px 16px;transition:border-color 0.15s">
-        <div style="display:flex;align-items:center;gap:12px">
-          <div style="width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;background:${m.color}18;color:${m.color};font-size:15px;flex-shrink:0">
-            <i class="fa-solid ${m.icon}"></i>
-          </div>
-          <div style="flex:1">
-            <div style="font-size:14px;font-weight:600">${m.label}</div>
-            <div style="font-size:11px;color:var(--text-muted)">${CustomerPages._sectionDesc(id, cfg)}</div>
-          </div>
-          <div style="display:flex;gap:4px;align-items:center">
-            <button class="btn btn-ghost btn-icon-sm" title="Move up" ${idx===0?'disabled style="opacity:0.3"':''} onclick="CustomerPages._wcMove('${id}',-1,${JSON.stringify(cfg).replace(/"/g,'&quot;')})"><i class="fa-solid fa-chevron-up"></i></button>
-            <button class="btn btn-ghost btn-icon-sm" title="Move down" ${idx===total-1?'disabled style="opacity:0.3"':''} onclick="CustomerPages._wcMove('${id}',1,${JSON.stringify(cfg).replace(/"/g,'&quot;')})"><i class="fa-solid fa-chevron-down"></i></button>
-            <label class="toggle" style="margin-left:6px" title="${sec.visible?'Hide':'Show'} section">
-              <input type="checkbox" ${sec.visible?'checked':''} onchange="CustomerPages._wcToggleSection('${id}',this.checked)">
-              <span class="toggle-slider"></span>
-            </label>
-          </div>
-        </div>
-        <div id="wc-sub-${id}" style="${!sec.visible?'opacity:0.4;pointer-events:none':''}">
-          ${CustomerPages._renderSubOptions(id, cfg)}
-        </div>
-      </div>`;
-    };
+    const cfg = JSON.parse(JSON.stringify(CustomerPages.getConfig()));
+    CustomerPages._wcCurrentOrder = cfg.sectionOrder.slice();
+    const renderRow = (id, idx, total) => CustomerPages._wcBuildRow(id, idx, total, cfg);
 
     App.openModal(`
       <div class="modal" style="max-width:580px">
@@ -474,7 +461,7 @@ const CustomerPages = {
     CustomerPages._rebuildWcPanel(cfg);
   },
 
-  _rebuildWcPanel(cfg) {
+  _wcBuildRow(id, i, total, cfg) {
     const sectionMeta = {
       kpi:{icon:'fa-gauge',label:'Summary Cards',color:'#3B82F6'},
       charts:{icon:'fa-chart-bar',label:'Charts',color:'#8B5CF6'},
@@ -482,30 +469,123 @@ const CustomerPages = {
       activity:{icon:'fa-list',label:'Activity Row',color:'#F59E0B'},
       extras:{icon:'fa-star',label:'Extra Widgets',color:'#EF4444'},
     };
+    const m = sectionMeta[id]; const sec = cfg[id];
+    return `
+    <div class="wc-section-row" id="wc-row-${id}" draggable="true" data-id="${id}"
+      style="background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:14px 16px"
+      ondragstart="CustomerPages._wcDragStart(event,'${id}')"
+      ondragover="CustomerPages._wcDragOver(event,'${id}')"
+      ondragleave="CustomerPages._wcDragLeave(event)"
+      ondrop="CustomerPages._wcDrop(event,'${id}')">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div class="drag-handle" title="Drag to reorder"><i class="fa-solid fa-grip-vertical"></i></div>
+        <div style="width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;background:${m.color}18;color:${m.color};font-size:15px;flex-shrink:0"><i class="fa-solid ${m.icon}"></i></div>
+        <div style="flex:1">
+          <div style="font-size:14px;font-weight:600">${m.label}</div>
+          <div style="font-size:11px;color:var(--text-muted)">${CustomerPages._sectionDesc(id,cfg)}</div>
+        </div>
+        <div style="display:flex;gap:4px;align-items:center">
+          <button class="btn btn-ghost btn-icon-sm" ${i===0?'disabled style="opacity:0.3"':''} onclick="CustomerPages._wcMove('${id}',-1,${JSON.stringify(cfg).replace(/"/g,'&quot;')})"><i class="fa-solid fa-chevron-up"></i></button>
+          <button class="btn btn-ghost btn-icon-sm" ${i===total-1?'disabled style="opacity:0.3"':''} onclick="CustomerPages._wcMove('${id}',1,${JSON.stringify(cfg).replace(/"/g,'&quot;')})"><i class="fa-solid fa-chevron-down"></i></button>
+          <label class="toggle" style="margin-left:6px"><input type="checkbox" ${sec.visible?'checked':''} onchange="CustomerPages._wcToggleSection('${id}',this.checked)"><span class="toggle-slider"></span></label>
+        </div>
+      </div>
+      <div id="wc-sub-${id}" style="${!sec.visible?'opacity:0.4;pointer-events:none':''}">
+        ${CustomerPages._renderSubOptions(id,cfg)}
+      </div>
+    </div>`;
+  },
+
+  _wcDragStart(event, id) {
+    CustomerPages._wcDragging = id;
+    event.currentTarget.classList.add('dragging');
+    event.dataTransfer.effectAllowed = 'move';
+  },
+
+  _wcDragOver(event, id) {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+    if (id !== CustomerPages._wcDragging) {
+      document.querySelectorAll('.wc-section-row').forEach(r => r.classList.remove('drag-over'));
+      event.currentTarget.classList.add('drag-over');
+    }
+  },
+
+  _wcDragLeave(event) {
+    event.currentTarget.classList.remove('drag-over');
+  },
+
+  _wcDrop(event, targetId) {
+    event.preventDefault();
+    const dragId = CustomerPages._wcDragging;
+    if (!dragId || dragId === targetId) {
+      document.querySelectorAll('.wc-section-row').forEach(r => r.classList.remove('dragging','drag-over'));
+      return;
+    }
+    const order = CustomerPages._wcCurrentOrder || [];
+    const fromIdx = order.indexOf(dragId);
+    const toIdx = order.indexOf(targetId);
+    if (fromIdx > -1 && toIdx > -1) {
+      order.splice(fromIdx, 1);
+      order.splice(toIdx, 0, dragId);
+      CustomerPages._wcCurrentOrder = order;
+      const cfg = CustomerPages.getConfig();
+      cfg.sectionOrder = order;
+      CustomerPages._rebuildWcPanel(cfg);
+    }
+    CustomerPages._wcDragging = null;
+  },
+
+  _rebuildWcPanel(cfg) {
     const container = document.getElementById('wc-sections');
     if (!container) return;
-    container.innerHTML = cfg.sectionOrder.map((id,i)=>{
-      const m=sectionMeta[id]; const sec=cfg[id];
-      return `
-      <div class="wc-section-row" style="background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:14px 16px">
-        <div style="display:flex;align-items:center;gap:12px">
-          <div style="width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;background:${m.color}18;color:${m.color};font-size:15px;flex-shrink:0"><i class="fa-solid ${m.icon}"></i></div>
-          <div style="flex:1">
-            <div style="font-size:14px;font-weight:600">${m.label}</div>
-            <div style="font-size:11px;color:var(--text-muted)">${CustomerPages._sectionDesc(id,cfg)}</div>
-          </div>
-          <div style="display:flex;gap:4px;align-items:center">
-            <button class="btn btn-ghost btn-icon-sm" ${i===0?'disabled style="opacity:0.3"':''} onclick="CustomerPages._wcMove('${id}',-1,${JSON.stringify(cfg).replace(/"/g,'&quot;')})"><i class="fa-solid fa-chevron-up"></i></button>
-            <button class="btn btn-ghost btn-icon-sm" ${i===cfg.sectionOrder.length-1?'disabled style="opacity:0.3"':''} onclick="CustomerPages._wcMove('${id}',1,${JSON.stringify(cfg).replace(/"/g,'&quot;')})"><i class="fa-solid fa-chevron-down"></i></button>
-            <label class="toggle" style="margin-left:6px"><input type="checkbox" ${sec.visible?'checked':''} onchange="CustomerPages._wcToggleSection('${id}',this.checked)"><span class="toggle-slider"></span></label>
-          </div>
-        </div>
-        <div id="wc-sub-${id}" style="${!sec.visible?'opacity:0.4;pointer-events:none':''}">
-          ${CustomerPages._renderSubOptions(id,cfg)}
-        </div>
-      </div>`;
-    }).join('');
+    container.innerHTML = cfg.sectionOrder.map((id,i)=>CustomerPages._wcBuildRow(id,i,cfg.sectionOrder.length,cfg)).join('');
     CustomerPages._wcCurrentOrder = cfg.sectionOrder.slice();
+  },
+
+  // ===== LIVE DASHBOARD DRAG =====
+  _dashDragStart(event, id) {
+    CustomerPages._dashDragging = id;
+    CustomerPages._dashDropPos = 'before';
+    event.dataTransfer.effectAllowed = 'move';
+    setTimeout(() => event.currentTarget.classList.add('dragging'), 0);
+  },
+
+  _dashDragOver(event, id) {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+    if (id === CustomerPages._dashDragging) return;
+    document.querySelectorAll('.dash-section-wrap').forEach(e => e.classList.remove('dash-drag-over-top','dash-drag-over-bottom'));
+    const rect = event.currentTarget.getBoundingClientRect();
+    const isBefore = event.clientY < rect.top + rect.height / 2;
+    event.currentTarget.classList.add(isBefore ? 'dash-drag-over-top' : 'dash-drag-over-bottom');
+    CustomerPages._dashDropTarget = id;
+    CustomerPages._dashDropPos = isBefore ? 'before' : 'after';
+  },
+
+  _dashDragLeave(event) {
+    event.currentTarget.classList.remove('dash-drag-over-top','dash-drag-over-bottom');
+  },
+
+  _dashDrop(event, targetId) {
+    event.preventDefault();
+    document.querySelectorAll('.dash-section-wrap').forEach(e => e.classList.remove('dragging','dash-drag-over-top','dash-drag-over-bottom'));
+    const dragId = CustomerPages._dashDragging;
+    CustomerPages._dashDragging = null;
+    if (!dragId || dragId === targetId) return;
+    const cfg = CustomerPages.getConfig();
+    const order = cfg.sectionOrder.slice();
+    const fromIdx = order.indexOf(dragId);
+    order.splice(fromIdx, 1);
+    const toIdx = order.indexOf(targetId);
+    order.splice(CustomerPages._dashDropPos === 'before' ? toIdx : toIdx + 1, 0, dragId);
+    cfg.sectionOrder = order;
+    CustomerPages.saveConfig(cfg);
+  },
+
+  _dashDragEnd(event) {
+    document.querySelectorAll('.dash-section-wrap').forEach(e => e.classList.remove('dragging','dash-drag-over-top','dash-drag-over-bottom'));
+    CustomerPages._dashDragging = null;
   },
 
   _applyConfig() {
@@ -1327,6 +1407,33 @@ const CustomerPages = {
                   <span class="toggle-slider" style="${a.frozen?'background:var(--danger)':''}"></span>
                 </label>
               </div>`).join('')}
+            </div>
+
+            <div class="settings-section">
+              <div class="settings-section-header">
+                <div class="settings-section-icon" style="background:#F0F9FF;color:#0284C7"><i class="fa-solid fa-universal-access"></i></div>
+                <div class="settings-section-title">Accessibility</div>
+              </div>
+              <div class="settings-row">
+                <div class="settings-row-info"><div class="settings-row-title">Text Size</div><div class="settings-row-desc">Increase text size across the whole app</div></div>
+                <select class="form-control" style="width:140px" onchange="App.setAccessibility('fontSize',this.value)">
+                  <option value="normal" ${(App.state.accessibility?.fontSize||'normal')==='normal'?'selected':''}>Normal</option>
+                  <option value="large" ${App.state.accessibility?.fontSize==='large'?'selected':''}>Large</option>
+                  <option value="xlarge" ${App.state.accessibility?.fontSize==='xlarge'?'selected':''}>Extra Large</option>
+                </select>
+              </div>
+              <div class="settings-row">
+                <div class="settings-row-info"><div class="settings-row-title">High Contrast</div><div class="settings-row-desc">Enhances colour contrast for better visibility</div></div>
+                <label class="toggle"><input type="checkbox" ${App.state.accessibility?.highContrast?'checked':''} onchange="App.setAccessibility('highContrast',this.checked)"><span class="toggle-slider"></span></label>
+              </div>
+              <div class="settings-row">
+                <div class="settings-row-info"><div class="settings-row-title">Reduced Motion</div><div class="settings-row-desc">Disable animations and transitions</div></div>
+                <label class="toggle"><input type="checkbox" ${App.state.accessibility?.reducedMotion?'checked':''} onchange="App.setAccessibility('reducedMotion',this.checked)"><span class="toggle-slider"></span></label>
+              </div>
+              <div class="settings-row">
+                <div class="settings-row-info"><div class="settings-row-title">Screen Reader Hints</div><div class="settings-row-desc">Add descriptive labels for assistive technology</div></div>
+                <label class="toggle"><input type="checkbox" onchange="App.toast('Screen reader support updated','success')"><span class="toggle-slider"></span></label>
+              </div>
             </div>
 
             <div class="settings-section">

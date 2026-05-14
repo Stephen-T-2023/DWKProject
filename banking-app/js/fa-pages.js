@@ -304,10 +304,42 @@ const FAPages = {
           </div>
           <div style="display:flex;gap:8px;margin-top:4px">
             <button class="btn btn-primary" style="flex:1" onclick="App.navigate('fa-reports');App.closeModal()"><i class="fa-solid fa-file-chart-column"></i> View Reports</button>
-            <button class="btn btn-secondary" style="flex:1" onclick="App.closeModal();FAPages.transferClient('${clientId}')"><i class="fa-solid fa-arrow-right-arrow-left"></i> Transfer</button>
+            <button class="btn btn-secondary" onclick="App.closeModal();FAPages.editClient('${clientId}')"><i class="fa-solid fa-pen"></i> Edit</button>
+            <button class="btn btn-secondary" onclick="App.closeModal();FAPages.transferClient('${clientId}')"><i class="fa-solid fa-arrow-right-arrow-left"></i> Transfer</button>
           </div>
         </div>
       </div>`);
+  },
+
+  editClient(clientId) {
+    const c = Data.users.find(x=>x.id===clientId);
+    if (!c) return;
+    App.openModal(`
+      <div class="modal" style="max-width:500px">
+        <div class="modal-header">
+          <div class="modal-title"><i class="fa-solid fa-pen" style="color:var(--accent);margin-right:8px"></i>Edit Client — ${c.name}</div>
+          <button class="modal-close" id="modal-close-btn"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="modal-body">
+          <div class="alert alert-info" style="font-size:12px"><i class="fa-solid fa-circle-info"></i><div>Changes are saved immediately and visible across all advisors.</div></div>
+          <div class="form-group"><label class="form-label">Full Name</label><input class="form-control" id="ec-name" value="${c.name}"></div>
+          <div class="form-group"><label class="form-label">Email Address</label><input class="form-control" type="email" id="ec-email" value="${c.email}"></div>
+          <div class="form-group"><label class="form-label">Phone Number</label><input class="form-control" id="ec-phone" value="${c.phone}"></div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" id="modal-cancel-btn">Cancel</button>
+          <button class="btn btn-primary" id="modal-confirm-btn"><i class="fa-solid fa-check"></i> Save Changes</button>
+        </div>
+      </div>`, () => {
+        const name = document.getElementById('ec-name')?.value.trim();
+        const email = document.getElementById('ec-email')?.value.trim();
+        const phone = document.getElementById('ec-phone')?.value.trim();
+        if (name) c.name = name;
+        if (email) c.email = email;
+        if (phone) c.phone = phone;
+        App.toast(`${c.name}'s details updated`, 'success');
+        App.navigate('fa-clients');
+      });
   },
 
   transferClient(preselectedClientId) {
@@ -357,93 +389,461 @@ const FAPages = {
 
   renderReports() {
     const u = App.state.user;
-    const myReports = Data.reports.filter(r=>r.faId===u.id);
-    const recentReports = [...myReports].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,3);
+    const myClients = Data.users.filter(x=>x.role==='customer'&&x.faId===u.id);
+    if (!FAPages._wordState) FAPages._wordState = { clientId: myClients[0]?.id, templateId: 'budget-intervention', chartCaption: 'Client spending trend', reportId: null };
+    const ws = FAPages._wordState;
+    const myReports = Data.reports.filter(r => r.faId === u.id);
+    const selectedClient = Data.users.find(x=>x.id===ws.clientId) || myClients[0];
+    const templates = [
+      { id:'budget-intervention', label:'Budget Review', name:'Budget Intervention Note', type:'Budget Review' },
+      { id:'quarterly-review', label:'Quarterly Review', name:'Q2 2026 Financial Summary', type:'Quarterly Review' },
+      { id:'mortgage-assessment', label:'Assessment', name:'Mortgage Pre-Assessment', type:'Assessment' },
+      { id:'isa-strategy', label:'Planning', name:'ISA Strategy Report', type:'Planning' },
+    ];
+    const selTpl = templates.find(t=>t.id===ws.templateId) || templates[0];
+    const a = App.state.accessibility;
     return `
     <div class="app-layout">
       ${App.buildSidebar('fa','fa-reports')}
-      <div class="main-content">
-        ${App.buildHeader('Reports','Manage client financial reports')}
-        <div class="page-content">
-          <div class="search-bar" style="margin-bottom:4px">
-            <div class="search-input-wrap"><div class="input-icon-wrap"><i class="input-icon fa-solid fa-magnifying-glass"></i><input class="form-control" placeholder="Search reports…"></div></div>
-            <select class="form-control" style="width:160px">
-              <option>All types</option><option>quarterly</option><option>annual</option><option>assessment</option><option>planning</option>
-            </select>
-            <select class="form-control" style="width:140px">
-              <option>All statuses</option><option>draft</option><option>final</option>
-            </select>
-            <button class="btn btn-primary btn-sm" onclick="FAPages.newReport()"><i class="fa-solid fa-plus"></i> New Report</button>
-            <button class="btn btn-secondary btn-sm" onclick="FAPages.showTemplates()"><i class="fa-solid fa-clone"></i> Templates</button>
-            <button class="btn btn-secondary btn-sm" onclick="FAPages.showAutomation()"><i class="fa-solid fa-robot"></i> Automation</button>
-          </div>
+      <div class="main-content" style="overflow:hidden;display:flex;flex-direction:column">
+        ${App.buildHeader('Reports','Client financial reports')}
+        <div class="word-editor">
 
-          <div class="card">
-            <div class="card-header">
-              <div><div class="card-title"><i class="fa-solid fa-clock-rotate-left" style="color:var(--accent);margin-right:6px"></i>Recent Activity</div><div class="card-subtitle">Latest additions and updates</div></div>
-              <span class="badge badge-info">${recentReports.length} recent</span>
+          <!-- LEFT PANEL -->
+          <div class="word-left">
+            ${selectedClient ? `
+            <div class="word-client-card">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:7px">
+                <div class="client-avatar" style="width:36px;height:36px;font-size:13px;background:${selectedClient.color}">${selectedClient.initials}</div>
+                <div>
+                  <div style="font-size:13px;font-weight:600">${selectedClient.name}</div>
+                  <div style="font-size:11px;color:var(--accent)">GBP 45k–55k · Medium risk</div>
+                </div>
+              </div>
+              <div style="display:flex;gap:4px;flex-wrap:wrap">
+                <span class="badge badge-warning" style="font-size:10px"><i class="fa-solid fa-triangle-exclamation"></i> Medium</span>
+                <span class="badge badge-info" style="font-size:10px"><i class="fa-solid fa-clock"></i> Assigned</span>
+              </div>
+            </div>` : ''}
+
+            <div>
+              <div class="word-section-label">Find client</div>
+              <div class="input-icon-wrap"><i class="input-icon fa-solid fa-magnifying-glass"></i>
+                <input class="form-control" placeholder="Search name, goal, risk…" style="font-size:12px" oninput="FAPages._wordSearch(this.value)">
+              </div>
+              <div id="word-client-results" style="display:flex;flex-direction:column;gap:4px;margin-top:6px">
+                ${myClients.map(c=>`
+                <div onclick="FAPages._wordSelectClient('${c.id}')"
+                  style="padding:6px 9px;border-radius:6px;cursor:pointer;border:1.5px solid ${c.id===ws.clientId?'var(--accent)':'var(--border)'};background:${c.id===ws.clientId?'var(--accent-glow)':''};font-size:12px;font-weight:${c.id===ws.clientId?'600':'400'}">
+                  <div style="display:flex;align-items:center;gap:6px">
+                    <div class="client-avatar" style="width:20px;height:20px;font-size:8px;background:${c.color}">${c.initials}</div>${c.name}
+                  </div>
+                </div>`).join('')}
+              </div>
             </div>
-            <div style="display:flex;flex-direction:column">
-              ${recentReports.map((r,i)=>{
-                const client = Data.users.find(x=>x.id===r.clientId);
-                return `
-                <div style="display:flex;align-items:center;gap:12px;padding:12px 0;${i<recentReports.length-1?'border-bottom:1px solid var(--border-light)':''}">
-                  <div style="width:40px;height:40px;border-radius:10px;background:${r.status==='final'?'var(--success-bg)':'var(--warning-bg)'};display:flex;align-items:center;justify-content:center;flex-shrink:0">
-                    <i class="fa-solid fa-file-lines" style="color:${r.status==='final'?'var(--success)':'var(--warning)'}"></i>
+
+            <div>
+              <div class="word-section-label">Report template</div>
+              <select class="form-control" style="font-size:12px" onchange="FAPages._wordSelectTemplate(this.value)">
+                ${templates.map(t=>`<option value="${t.id}" ${t.id===ws.templateId?'selected':''}>${t.label}</option>`).join('')}
+              </select>
+            </div>
+
+            <div>
+              <div class="word-section-label">Recently used template</div>
+              ${templates.slice(0,2).map(t=>`
+              <div style="padding:5px 0;font-size:12px;font-weight:500;color:var(--text-secondary);display:flex;align-items:center;gap:6px">
+                <i class="fa-solid fa-file-lines" style="color:var(--accent);font-size:11px"></i>${t.name}
+              </div>`).join('')}
+              <button class="btn btn-secondary btn-sm btn-full" style="margin-top:6px" onclick="FAPages.showTemplates()"><i class="fa-solid fa-file-lines"></i> Open template</button>
+            </div>
+
+            <div>
+              <div class="word-section-label">Saved reports</div>
+              ${myReports.length ? myReports.map(r => {
+                const rc = Data.users.find(x=>x.id===r.clientId);
+                return `<div style="border-radius:6px;border:1.5px solid ${r.id===ws.reportId?'var(--accent)':'var(--border)'};background:${r.id===ws.reportId?'var(--accent-glow)':''};margin-bottom:5px;overflow:hidden">
+                  <div onclick="FAPages._wordOpenReport('${r.id}')" style="padding:7px 9px;cursor:pointer">
+                    <div style="font-size:12px;font-weight:600;color:var(--text)">${r.title}</div>
+                    <div style="font-size:11px;color:var(--text-muted);margin-top:2px">${rc?.name||'Unknown'} · ${r.date}</div>
                   </div>
-                  <div style="flex:1;min-width:0">
-                    <div style="font-weight:500;font-size:13.5px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-                      ${r.title}
-                      ${i===0?'<span class="badge badge-info" style="font-size:10px;padding:2px 7px">NEW</span>':''}
+                  <div style="display:flex;align-items:center;justify-content:space-between;padding:4px 9px 6px">
+                    <span class="badge ${r.status==='final'?'badge-success':'badge-warning'}" style="font-size:10px">${r.status}</span>
+                    <div style="display:flex;gap:3px">
+                      <button class="btn btn-ghost btn-icon-sm" title="Edit" onclick="FAPages._wordEditReport('${r.id}',event)" style="width:22px;height:22px;min-width:0;font-size:10px"><i class="fa-solid fa-pen"></i></button>
+                      <button class="btn btn-ghost btn-icon-sm" title="Delete" onclick="FAPages._wordDeleteReport('${r.id}',event)" style="width:22px;height:22px;min-width:0;font-size:10px;color:var(--danger)"><i class="fa-solid fa-trash"></i></button>
                     </div>
-                    <div style="font-size:12px;color:var(--text-muted);margin-top:2px">${client?.name} · ${App.fmt.date(r.date)} · <span class="tag" style="font-size:11px">${r.type}</span></div>
-                  </div>
-                  <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
-                    <span class="badge ${r.status==='final'?'badge-success':'badge-warning'}">${r.status}</span>
-                    <button class="btn btn-ghost btn-sm" onclick="FAPages.viewReport('${r.id}')"><i class="fa-solid fa-eye"></i></button>
                   </div>
                 </div>`;
-              }).join('')}
+              }).join('') : '<div style="font-size:12px;color:var(--text-muted)">No saved reports yet.</div>'}
+            </div>
+
+            <div style="margin-top:auto;padding-top:12px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:6px">
+              <button class="btn btn-ghost btn-sm" onclick="FAPages._wordNewReport()"><i class="fa-solid fa-plus"></i> New Report</button>
+              <button class="btn btn-secondary btn-sm" onclick="FAPages._wordSaveDraft()"><i class="fa-solid fa-floppy-disk"></i> Save Draft</button>
+              <button class="btn btn-primary btn-sm" onclick="FAPages._wordPublish()"><i class="fa-solid fa-check"></i> Publish Report</button>
             </div>
           </div>
 
-          <div style="display:flex;flex-direction:column;gap:14px">
-            ${myReports.map(r=>{
-              const client = Data.users.find(x=>x.id===r.clientId);
-              return `
-              <div class="report-card" id="rep-${r.id}">
-                <div class="report-header">
-                  <div style="flex:1">
-                    <div class="report-title">${r.title}</div>
-                    <div style="display:flex;align-items:center;gap:8px;margin-top:4px">
-                      <div class="client-avatar" style="width:22px;height:22px;font-size:10px;background:${client?.color}">${client?.initials}</div>
-                      <span class="report-client">${client?.name}</span>
-                    </div>
-                  </div>
-                  <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
-                    <span class="badge ${r.status==='final'?'badge-success':'badge-warning'}">${r.status}</span>
-                    <span class="tag"><i class="fa-solid fa-tag"></i> ${r.type}</span>
-                  </div>
-                </div>
-                <div class="report-preview">${r.preview}</div>
-                <div class="report-footer">
-                  <span style="font-size:12px;color:var(--text-muted)"><i class="fa-regular fa-calendar"></i> ${App.fmt.date(r.date)}</span>
-                  <div style="display:flex;gap:6px">
-                    <button class="btn btn-ghost btn-sm" onclick="FAPages.viewReport('${r.id}')"><i class="fa-solid fa-eye"></i> View</button>
-                    <button class="btn btn-secondary btn-sm" onclick="FAPages.editReport('${r.id}')"><i class="fa-solid fa-pen"></i> Edit</button>
-                    <button class="btn btn-secondary btn-sm" onclick="App.toast('Report exported as PDF','success')"><i class="fa-solid fa-download"></i></button>
-                    <button class="btn btn-secondary btn-sm" onclick="FAPages.deleteReport('${r.id}')"><i class="fa-solid fa-trash" style="color:var(--danger)"></i></button>
-                  </div>
-                </div>
-              </div>`;
-            }).join('')}
+          <!-- CENTER: DOCUMENT EDITOR -->
+          <div class="word-center">
+            <div class="word-tabs">
+              <div class="word-tab active">Home</div>
+              <div class="word-tab">Insert</div>
+              <div class="word-tab">Layout</div>
+              <div class="word-tab">Chart Format</div>
+            </div>
+            <div class="word-toolbar">
+              <select class="form-control" style="width:82px;font-size:11px;padding:2px 5px;height:26px"><option>Aptos</option><option>Calibri</option><option>Arial</option><option>Georgia</option></select>
+              <select class="form-control" style="width:44px;font-size:11px;padding:2px 4px;height:26px"><option>12</option><option>10</option><option>11</option><option>14</option><option>16</option></select>
+              <div class="word-toolbar-sep"></div>
+              <button class="btn btn-ghost btn-icon-sm" style="font-weight:700;font-size:13px;min-width:26px" title="Bold">B</button>
+              <button class="btn btn-ghost btn-icon-sm" style="font-style:italic;font-size:13px;min-width:26px" title="Italic">I</button>
+              <button class="btn btn-ghost btn-icon-sm" style="text-decoration:underline;font-size:13px;min-width:26px" title="Underline">U</button>
+              <div class="word-toolbar-sep"></div>
+              <button class="btn btn-ghost btn-icon-sm" title="Bullets"><i class="fa-solid fa-list-ul" style="font-size:10px"></i></button>
+              <button class="btn btn-ghost btn-icon-sm" title="Align Left"><i class="fa-solid fa-align-left" style="font-size:10px"></i></button>
+              <button class="btn btn-ghost btn-icon-sm" title="Centre"><i class="fa-solid fa-align-center" style="font-size:10px"></i></button>
+              <button class="btn btn-ghost btn-icon-sm" title="Right"><i class="fa-solid fa-align-right" style="font-size:10px"></i></button>
+              <div class="word-toolbar-sep"></div>
+              <select class="form-control" style="width:74px;font-size:11px;padding:2px 4px;height:26px"><option>Styles</option><option>Heading 1</option><option>Heading 2</option><option>Normal</option></select>
+            </div>
+            <div class="word-ruler">
+              ${Array.from({length:13},(_,i)=>`<span style="flex:1;text-align:center;color:#888;font-size:9px">${i||''}</span>`).join('')}
+            </div>
+            <div class="word-doc-scroll">
+              <div class="word-paper" id="word-paper">
+                ${FAPages._renderWordDoc(selectedClient, selTpl)}
+              </div>
+            </div>
           </div>
+
+          <!-- RIGHT PANEL: CHART PROPERTIES -->
+          <div class="word-right">
+            <div style="font-size:14px;font-weight:700">Client spending trend</div>
+            <div>
+              <div class="word-section-label">Caption</div>
+              <input class="form-control" style="font-size:12px" value="${ws.chartCaption}" id="word-chart-caption" oninput="FAPages._wordUpdateChartCaption(this.value)">
+            </div>
+            <div>
+              <div class="word-section-label">Chart note</div>
+              <textarea class="form-control" rows="3" style="font-size:12px;resize:none" id="word-chart-note">Client direct data for the selected customer.</textarea>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+              <div>
+                <div class="word-section-label">Width</div>
+                <input type="range" min="160" max="420" value="310" style="width:100%;accent-color:var(--accent)" oninput="FAPages._wordSlider('word-width-lbl',this.value,'px')">
+                <div style="font-size:11px;color:var(--text-muted)" id="word-width-lbl">310px</div>
+              </div>
+              <div>
+                <div class="word-section-label">Height</div>
+                <input type="range" min="100" max="340" value="220" style="width:100%;accent-color:var(--accent)" oninput="FAPages._wordSlider('word-height-lbl',this.value,'px')">
+                <div style="font-size:11px;color:var(--text-muted)" id="word-height-lbl">220px</div>
+              </div>
+            </div>
+            <div>
+              <div class="word-section-label">Data period</div>
+              <input type="range" min="1" max="4" value="2" style="width:100%;accent-color:var(--accent)"
+                oninput="FAPages._wordPeriod(this.value)">
+              <div style="font-size:11px;color:var(--text-muted)" id="word-period-lbl">Last 6 months</div>
+            </div>
+            <div>
+              <div class="word-section-label">Chart text fit</div>
+              <input type="range" min="8" max="16" value="10" style="width:100%;accent-color:var(--accent)"
+                oninput="FAPages._wordSlider('word-textfit-lbl',this.value,'pt axis and legend labels')">
+              <div style="font-size:11px;color:var(--text-muted)" id="word-textfit-lbl">10pt axis and legend labels</div>
+            </div>
+            <div>
+              <div style="font-size:13px;font-weight:600;margin-bottom:6px">Wrap behaviour</div>
+              <div style="font-size:12px;color:var(--text-muted);line-height:1.55">Charts are static for the demo. Use wrap, width, height, text size, and top spacing to place them neatly in the report flow.</div>
+            </div>
+            <div class="divider"></div>
+            <button class="btn btn-secondary btn-sm btn-full" onclick="App.toast('Report exported as PDF','success')"><i class="fa-solid fa-download"></i> Export PDF</button>
+          </div>
+
         </div>
       </div>
     </div>`;
   },
 
-  initReports() {},
+  _renderWordDoc(client, template) {
+    const id = template?.id || 'budget-intervention';
+    const ws = FAPages._wordState || {};
+    const savedReport = ws.reportId ? Data.reports.find(x=>x.id===ws.reportId) : null;
+    const statusBadge = savedReport
+      ? `<span class="badge ${savedReport.status==='final'?'badge-success':'badge-warning'}" style="font-size:11px;margin-left:8px">${savedReport.status}</span>`
+      : '';
+    const reportMeta = savedReport
+      ? `SAVED REPORT &nbsp;·&nbsp; ${savedReport.date}`
+      : 'ADVISOR WORK FILE &nbsp;·&nbsp; NEW DOCUMENT';
+    const contentMap = {
+      'budget-intervention': `
+        <div class="word-doc-system-header">DWK Personal Finance Management System</div>
+        <div style="position:relative">
+          <span class="word-doc-risk-badge"><span class="badge badge-warning"><i class="fa-solid fa-triangle-exclamation"></i> Medium risk</span></span>
+          <div class="word-doc-h1">${savedReport?.title || 'Budget Intervention Note'}${statusBadge}</div>
+          <div class="word-doc-h2">Budget Review for ${client?.name || 'Client'}</div>
+          <div class="word-doc-meta">${reportMeta}</div>
+        </div>
+        <div class="word-clearfix">
+          <div class="word-inline-chart" id="word-inline-chart-wrap" style="width:280px">
+            <canvas id="word-inner-chart" style="width:260px;height:170px;display:block"></canvas>
+            <div class="word-inline-chart-caption" id="word-inline-caption">Figure: Client spending trend</div>
+          </div>
+          <div class="word-doc-body">
+            <p><em><strong>Budget intervention note.</strong> This work file summarises overspending signals and documents a practical budget discussion for the next client meeting.</em></p>
+            <h3>Areas to review</h3>
+            <ul>
+              <li>Compare current month spending with the client's usual baseline.</li>
+              <li>Identify categories where the client may want alerts or lower limits.</li>
+              <li>Discuss whether any one-off purchases should be excluded from long-term forecasting.</li>
+            </ul>
+            <h3>Proposed customer conversation</h3>
+            <p>Use neutral language, avoid automated advice, and agree any changes directly with the client before updating budget limits in the system.</p>
+            <p>Record the outcome of the discussion below and update the case notes accordingly.</p>
+          </div>
+        </div>`,
+      'quarterly-review': `
+        <div class="word-doc-system-header">DWK Personal Finance Management System</div>
+        <div class="word-doc-h1">${savedReport?.title || 'Q2 2026 Financial Summary'}${statusBadge}</div>
+        <div class="word-doc-h2">Quarterly Review for ${client?.name || 'Client'}</div>
+        <div class="word-doc-meta">${reportMeta}</div>
+        <div class="word-doc-body">
+          <p>Net worth increased by <strong>8.2%</strong> over Q2. Savings rate maintained at 22%. Pension contributions on track for target retirement age of 62.</p>
+          <h3>Portfolio Performance</h3>
+          <ul>
+            <li>Current account balance stable with regular salary credits.</li>
+            <li>ISA contributions up to date; £8,200 of annual allowance used.</li>
+            <li>Credit card utilisation below 30% — within healthy range.</li>
+          </ul>
+          <h3>Recommendations</h3>
+          <ul>
+            <li>Review fixed-rate mortgage options ahead of the July renewal window.</li>
+            <li>Consider increasing pension contributions by 2% to maximise employer match.</li>
+          </ul>
+        </div>`,
+      'mortgage-assessment': `
+        <div class="word-doc-system-header">DWK Personal Finance Management System</div>
+        <div class="word-doc-h1">${savedReport?.title || 'Mortgage Pre-Assessment'}${statusBadge}</div>
+        <div class="word-doc-h2">Assessment for ${client?.name || 'Client'}</div>
+        <div class="word-doc-meta">${reportMeta}</div>
+        <div class="word-doc-body">
+          <p>Based on income verification and credit profile, client qualifies for up to <strong>£285,000</strong> mortgage at 4.2% fixed rate over 25 years.</p>
+          <h3>Eligibility Summary</h3>
+          <ul>
+            <li>Verified annual income: £38,400</li>
+            <li>Credit score: 742 (Good)</li>
+            <li>Deposit available: £42,000 (14.7%)</li>
+            <li>Debt-to-income ratio: 22%</li>
+          </ul>
+          <h3>Next Steps</h3>
+          <ul>
+            <li>Obtain Agreement in Principle from preferred lender.</li>
+            <li>Instruct a surveyor once an offer is accepted.</li>
+          </ul>
+        </div>`,
+      'isa-strategy': `
+        <div class="word-doc-system-header">DWK Personal Finance Management System</div>
+        <div class="word-doc-h1">${savedReport?.title || 'ISA Strategy Report'}${statusBadge}</div>
+        <div class="word-doc-h2">Planning Report for ${client?.name || 'Client'}</div>
+        <div class="word-doc-meta">${reportMeta}</div>
+        <div class="word-doc-body">
+          <p>Recommended split: <strong>60% Stocks & Shares ISA</strong>, <strong>40% Cash ISA</strong>. Projected growth of £2,100 over 12 months at current rates.</p>
+          <h3>Allocation Rationale</h3>
+          <ul>
+            <li>Client risk profile: Balanced (Medium)</li>
+            <li>Time horizon: 5–10 years to target</li>
+            <li>Annual ISA allowance remaining: £12,300</li>
+          </ul>
+          <h3>Tax Efficiency Notes</h3>
+          <ul>
+            <li>All ISA growth and income is free from UK income tax and capital gains tax.</li>
+            <li>Flexible ISA rules allow withdrawals and re-contributions within the same tax year.</li>
+          </ul>
+        </div>`,
+    };
+    return contentMap[id] || contentMap['budget-intervention'];
+  },
+
+  initReports() {
+    if (!document.getElementById('word-inner-chart')) return;
+    App.createChart('word-inner-chart', {
+      type: 'line',
+      data: {
+        labels: ['Jul','Aug','Sep','Oct','Nov','Dec'],
+        datasets: [{
+          label: 'Spending',
+          data: [2180, 2100, 2250, 2310, 2280, 2950],
+          borderColor: '#0066FF', backgroundColor: 'rgba(0,102,255,0.08)',
+          fill: true, tension: 0.4, pointBackgroundColor: '#0066FF', pointRadius: 3,
+        }]
+      },
+      options: {
+        responsive: false, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { display: false }, ticks: { font: { size: 9 } } },
+          y: { grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { font: { size: 9 }, callback: v => '£'+v } }
+        }
+      }
+    });
+  },
+
+  _wordSelectClient(id) {
+    FAPages._wordState = Object.assign({}, FAPages._wordState, { clientId: id });
+    App.navigate('fa-reports');
+  },
+
+  _wordSelectTemplate(id) {
+    FAPages._wordState = Object.assign({}, FAPages._wordState, { templateId: id, reportId: null });
+    App.navigate('fa-reports');
+  },
+
+  _wordOpenReport(id) {
+    const r = Data.reports.find(x=>x.id===id);
+    if (!r) return;
+    const typeMap = { quarterly:'quarterly-review', assessment:'mortgage-assessment', planning:'isa-strategy', budget:'budget-intervention', annual:'quarterly-review' };
+    FAPages._wordState = Object.assign({}, FAPages._wordState, {
+      reportId: id,
+      clientId: r.clientId,
+      templateId: typeMap[r.type] || 'quarterly-review',
+    });
+    App.navigate('fa-reports');
+  },
+
+  _wordNewReport() {
+    FAPages._wordState = Object.assign({}, FAPages._wordState, { reportId: null });
+    App.navigate('fa-reports');
+  },
+
+  _wordEditReport(id, event) {
+    event.stopPropagation();
+    const r = Data.reports.find(x=>x.id===id);
+    if (!r) return;
+    App.openModal(`
+      <div class="modal" style="max-width:420px">
+        <div class="modal-header">
+          <div class="modal-title"><i class="fa-solid fa-pen" style="color:var(--accent);margin-right:8px"></i>Edit Report</div>
+          <button class="modal-close" id="modal-close-btn"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="modal-body" style="display:flex;flex-direction:column;gap:14px">
+          <div>
+            <label class="form-label">Title</label>
+            <input class="form-control" id="edit-rep-title" value="${r.title}">
+          </div>
+          <div>
+            <label class="form-label">Status</label>
+            <select class="form-control" id="edit-rep-status">
+              <option value="draft" ${r.status==='draft'?'selected':''}>Draft</option>
+              <option value="final" ${r.status==='final'?'selected':''}>Final</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" onclick="App.closeModal()">Cancel</button>
+          <button class="btn btn-primary" onclick="FAPages._wordSaveEditReport('${id}')"><i class="fa-solid fa-check"></i> Save Changes</button>
+        </div>
+      </div>
+    `);
+  },
+
+  _wordSaveEditReport(id) {
+    const r = Data.reports.find(x=>x.id===id);
+    if (!r) return;
+    const title = document.getElementById('edit-rep-title')?.value.trim();
+    const status = document.getElementById('edit-rep-status')?.value;
+    if (title) r.title = title;
+    if (status) r.status = status;
+    App.closeModal();
+    App.toast('Report updated', 'success');
+    App.navigate('fa-reports');
+  },
+
+  _wordDeleteReport(id, event) {
+    event.stopPropagation();
+    const r = Data.reports.find(x=>x.id===id);
+    if (!r) return;
+    App.openModal(`
+      <div class="modal" style="max-width:380px">
+        <div class="modal-header">
+          <div class="modal-title" style="color:var(--danger)"><i class="fa-solid fa-trash" style="margin-right:8px"></i>Delete Report</div>
+          <button class="modal-close" id="modal-close-btn"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="modal-body">
+          <p>Are you sure you want to delete <strong>"${r.title}"</strong>? This cannot be undone.</p>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" onclick="App.closeModal()">Cancel</button>
+          <button class="btn btn-danger" onclick="FAPages._wordConfirmDeleteReport('${id}')"><i class="fa-solid fa-trash"></i> Delete</button>
+        </div>
+      </div>
+    `);
+  },
+
+  _wordConfirmDeleteReport(id) {
+    const idx = Data.reports.findIndex(x=>x.id===id);
+    if (idx > -1) Data.reports.splice(idx, 1);
+    if (FAPages._wordState?.reportId === id) FAPages._wordState = Object.assign({}, FAPages._wordState, { reportId: null });
+    App.closeModal();
+    App.toast('Report deleted', 'warning');
+    App.navigate('fa-reports');
+  },
+
+  _wordSearch(val) {
+    const q = val.toLowerCase();
+    document.querySelectorAll('#word-client-results > div').forEach(el => {
+      el.style.display = el.textContent.toLowerCase().includes(q) ? '' : 'none';
+    });
+  },
+
+  _wordUpdateChartCaption(val) {
+    FAPages._wordState.chartCaption = val;
+    const cap = document.getElementById('word-inline-caption');
+    if (cap) cap.textContent = 'Figure: ' + val;
+  },
+
+  _wordSlider(lblId, val, suffix) {
+    const el = document.getElementById(lblId);
+    if (el) el.textContent = val + suffix;
+  },
+
+  _wordPeriod(val) {
+    const labels = ['Last 3 months','Last 6 months','Last 12 months','All time'];
+    const el = document.getElementById('word-period-lbl');
+    if (el) el.textContent = labels[parseInt(val)-1] || 'Last 6 months';
+  },
+
+  _wordPublish() {
+    const ws = FAPages._wordState || {};
+    const newId = 'REP' + String(Data.reports.length + 1).padStart(3, '0');
+    const tpl = ['Budget Intervention Note','Q2 2026 Financial Summary','Mortgage Pre-Assessment','ISA Strategy Report'];
+    const idx = ['budget-intervention','quarterly-review','mortgage-assessment','isa-strategy'].indexOf(ws.templateId);
+    Data.reports.push({
+      id: newId, faId: App.state.user.id, clientId: ws.clientId,
+      title: tpl[idx] || 'New Report', type: ws.templateId || 'quarterly',
+      date: new Date().toISOString().slice(0,10), status: 'final',
+      preview: 'Published via Word editor.'
+    });
+    App.toast('Report published successfully!', 'success');
+    FAPages._wordState = null;
+    App.navigate('fa-reports');
+  },
+
+  _wordSaveDraft() {
+    const ws = FAPages._wordState || {};
+    const tpl = ['Budget Intervention Note','Q2 2026 Financial Summary','Mortgage Pre-Assessment','ISA Strategy Report'];
+    const idx = ['budget-intervention','quarterly-review','mortgage-assessment','isa-strategy'].indexOf(ws.templateId);
+    const newId = 'REP' + String(Data.reports.length + 1).padStart(3, '0');
+    Data.reports.push({
+      id: newId, faId: App.state.user.id, clientId: ws.clientId,
+      title: (tpl[idx] || 'Draft Report') + ' (Draft)', type: ws.templateId || 'quarterly',
+      date: new Date().toISOString().slice(0,10), status: 'draft',
+      preview: 'Saved as draft via Word editor.'
+    });
+    FAPages._wordState = Object.assign({}, ws, { reportId: newId });
+    App.toast('Draft saved', 'warning');
+    App.navigate('fa-reports');
+  },
 
   newReport() {
     const clients = Data.users.filter(x=>x.role==='customer');
@@ -851,7 +1251,26 @@ const FAPages = {
                   <i class="fa-solid ${i}" style="color:var(--accent);width:16px"></i>
                   <div><div style="font-size:11px;color:var(--text-muted)">${l}</div><div style="font-size:13.5px;font-weight:500">${v}</div></div>
                 </div>`).join('')}
-                <button class="btn btn-secondary btn-full" style="margin-top:12px" onclick="App.toast('Edit mode enabled','default')"><i class="fa-solid fa-pen"></i> Edit Profile</button>
+                <button class="btn btn-secondary btn-full" style="margin-top:12px" onclick="FAPages.editProfile()"><i class="fa-solid fa-pen"></i> Edit Profile</button>
+              </div>
+              <div class="card">
+                <div class="card-title" style="margin-bottom:14px"><i class="fa-solid fa-universal-access" style="color:#0284C7;margin-right:8px"></i>Accessibility</div>
+                <div class="settings-row">
+                  <div class="settings-row-info"><div class="settings-row-title">Text Size</div><div class="settings-row-desc">Increase text size across the app</div></div>
+                  <select class="form-control" style="width:120px" onchange="App.setAccessibility('fontSize',this.value)">
+                    <option value="normal" ${(App.state.accessibility?.fontSize||'normal')==='normal'?'selected':''}>Normal</option>
+                    <option value="large" ${App.state.accessibility?.fontSize==='large'?'selected':''}>Large</option>
+                    <option value="xlarge" ${App.state.accessibility?.fontSize==='xlarge'?'selected':''}>Extra Large</option>
+                  </select>
+                </div>
+                <div class="settings-row">
+                  <div class="settings-row-info"><div class="settings-row-title">High Contrast</div><div class="settings-row-desc">Enhanced colour contrast</div></div>
+                  <label class="toggle"><input type="checkbox" ${App.state.accessibility?.highContrast?'checked':''} onchange="App.setAccessibility('highContrast',this.checked)"><span class="toggle-slider"></span></label>
+                </div>
+                <div class="settings-row">
+                  <div class="settings-row-info"><div class="settings-row-title">Reduced Motion</div><div class="settings-row-desc">Disable animations</div></div>
+                  <label class="toggle"><input type="checkbox" ${App.state.accessibility?.reducedMotion?'checked':''} onchange="App.setAccessibility('reducedMotion',this.checked)"><span class="toggle-slider"></span></label>
+                </div>
               </div>
             </div>
             <div style="display:flex;flex-direction:column;gap:16px">
@@ -879,6 +1298,46 @@ const FAPages = {
         </div>
       </div>
     </div>`;
+  },
+
+  editProfile() {
+    const u = App.state.user;
+    App.openModal(`
+      <div class="modal" style="max-width:500px">
+        <div class="modal-header">
+          <div class="modal-title"><i class="fa-solid fa-pen" style="color:var(--accent);margin-right:8px"></i>Edit Profile</div>
+          <button class="modal-close" id="modal-close-btn"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group"><label class="form-label">Full Name</label><input class="form-control" id="edit-name" value="${u.name}"></div>
+          <div class="form-group"><label class="form-label">Email Address</label><input class="form-control" type="email" id="edit-email" value="${u.email}"></div>
+          <div class="form-group"><label class="form-label">Phone Number</label><input class="form-control" id="edit-phone" value="${u.phone}"></div>
+          <div class="form-group"><label class="form-label">Specialty</label>
+            <select class="form-control" id="edit-specialty">
+              <option ${u.specialty==='Retail Banking'?'selected':''}>Retail Banking</option>
+              <option ${u.specialty==='Investments'?'selected':''}>Investments</option>
+              <option ${u.specialty==='Mortgages'?'selected':''}>Mortgages</option>
+              <option ${u.specialty==='Pensions'?'selected':''}>Pensions</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" id="modal-cancel-btn">Cancel</button>
+          <button class="btn btn-primary" id="modal-confirm-btn"><i class="fa-solid fa-check"></i> Save Changes</button>
+        </div>
+      </div>`, () => {
+        const name = document.getElementById('edit-name')?.value.trim();
+        const email = document.getElementById('edit-email')?.value.trim();
+        const phone = document.getElementById('edit-phone')?.value.trim();
+        const specialty = document.getElementById('edit-specialty')?.value;
+        if (name) u.name = name;
+        if (email) u.email = email;
+        if (phone) u.phone = phone;
+        if (specialty) u.specialty = specialty;
+        sessionStorage.setItem('nx_user', JSON.stringify(u));
+        App.toast('Profile updated successfully', 'success');
+        App.navigate('fa-profile');
+      });
   },
 
   initProfile: function() {

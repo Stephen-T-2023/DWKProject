@@ -7,7 +7,7 @@ const AuthPages = {
       <div class="auth-left">
         <div class="auth-brand">
           <div class="auth-brand-logo"><img src="assets/logo.svg" style="width:28px;height:28px;filter:brightness(0) invert(1);"></div>
-          <div class="auth-brand-name">Codeherence</div>
+          <div class="auth-brand-name">DWK</div>
         </div>
         <div class="auth-tagline">
           <h2>Banking built<br>around you.</h2>
@@ -23,7 +23,7 @@ const AuthPages = {
       <div class="auth-right">
         <div class="auth-form-wrap">
           <div class="auth-form-title">Welcome back</div>
-          <div class="auth-form-subtitle">Sign in to your Codeherence account</div>
+          <div class="auth-form-subtitle">Sign in to your DWK account</div>
 
           <div class="auth-form">
             <div class="form-group">
@@ -86,7 +86,7 @@ const AuthPages = {
     document.querySelectorAll('.role-btn').forEach(b => b.classList.remove('active'));
     document.getElementById('role-' + role).classList.add('active');
     App.state.pendingRole = role;
-    const emails = { customer:'sarah@email.com', fa:'david@codeherence.com', teamleader:'robert@codeherence.com' };
+    const emails = { customer:'sarah@email.com', fa:'david@dwk.com', teamleader:'robert@dwk.com' };
     document.getElementById('login-email').value = emails[role];
   },
 
@@ -112,7 +112,7 @@ const AuthPages = {
       <div class="auth-left">
         <div class="auth-brand">
           <div class="auth-brand-logo"><img src="assets/logo.svg" style="width:28px;height:28px;filter:brightness(0) invert(1);"></div>
-          <div class="auth-brand-name">Codeherence</div>
+          <div class="auth-brand-name">DWK</div>
         </div>
         <div class="auth-tagline">
           <h2>Two-Factor Authentication</h2>
@@ -341,7 +341,7 @@ const AuthPages = {
     return `
       <div class="auth-page">
         <div class="auth-left">
-          <div class="auth-brand"><div class="auth-brand-logo"><img src="assets/logo.svg" style="width:28px;height:28px;filter:brightness(0) invert(1);"></div><div class="auth-brand-name">Codeherence</div></div>
+          <div class="auth-brand"><div class="auth-brand-logo"><img src="assets/logo.svg" style="width:28px;height:28px;filter:brightness(0) invert(1);"></div><div class="auth-brand-name">DWK</div></div>
           <div class="auth-tagline">
             <h2>Account Recovery</h2>
             <p>We'll help you get back into your account quickly and securely.</p>

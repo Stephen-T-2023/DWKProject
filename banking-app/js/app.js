@@ -3,16 +3,27 @@ const App = {
   state: {
     user: null,
     privacyMode: false,
+    hiddenBalances: [],
     accounts: [],
     currentPage: 'login',
     pendingRole: null,
     twoFAMethod: 'biometric',
     chartInstances: {},
     notifCount: 3,
+    accessibility: { fontSize: 'normal', highContrast: false, reducedMotion: false },
   },
 
   init() {
     App.applyTheme(localStorage.getItem('nx_theme') || '#0066FF');
+    try {
+      const hb = localStorage.getItem('nx_hidden_balances');
+      if (hb) App.state.hiddenBalances = JSON.parse(hb);
+    } catch(e) {}
+    try {
+      const acc = localStorage.getItem('nx_accessibility');
+      if (acc) App.state.accessibility = Object.assign({}, App.state.accessibility, JSON.parse(acc));
+    } catch(e) {}
+    App.applyAccessibility();
     const saved = sessionStorage.getItem('nx_user');
     if (saved) {
       App.state.user = JSON.parse(saved);
@@ -150,11 +161,48 @@ const App = {
 
   applyPrivacy() {
     document.querySelectorAll('.account-card-balance').forEach(el => {
-      el.classList.toggle('blurred', App.state.privacyMode);
+      const perAccountHidden = App.state.hiddenBalances.includes(el.dataset.accountId);
+      el.classList.toggle('blurred', App.state.privacyMode || perAccountHidden);
     });
     document.querySelectorAll('.privacy-sensitive').forEach(el => {
       el.classList.toggle('tx-hidden', App.state.privacyMode);
     });
+  },
+
+  applyAccessibility() {
+    const a = App.state.accessibility;
+    document.body.classList.remove('font-large', 'font-xlarge', 'high-contrast', 'reduced-motion');
+    if (a.fontSize === 'large') document.body.classList.add('font-large');
+    if (a.fontSize === 'xlarge') document.body.classList.add('font-xlarge');
+    if (a.highContrast) document.body.classList.add('high-contrast');
+    if (a.reducedMotion) document.body.classList.add('reduced-motion');
+  },
+
+  setAccessibility(key, val) {
+    App.state.accessibility[key] = val;
+    localStorage.setItem('nx_accessibility', JSON.stringify(App.state.accessibility));
+    App.applyAccessibility();
+    App.toast('Accessibility updated', 'success', 1500);
+  },
+
+  toggleAccountBalance(accountId, event) {
+    event.stopPropagation();
+    const idx = App.state.hiddenBalances.indexOf(accountId);
+    if (idx > -1) {
+      App.state.hiddenBalances.splice(idx, 1);
+    } else {
+      App.state.hiddenBalances.push(accountId);
+    }
+    localStorage.setItem('nx_hidden_balances', JSON.stringify(App.state.hiddenBalances));
+    const isHidden = App.state.hiddenBalances.includes(accountId);
+    const balanceEl = document.getElementById(`balance-${accountId}`);
+    if (balanceEl) balanceEl.classList.toggle('blurred', App.state.privacyMode || isHidden);
+    const btn = document.getElementById(`acc-eye-${accountId}`);
+    if (btn) {
+      btn.innerHTML = isHidden ? '<i class="fa-solid fa-eye-slash"></i>' : '<i class="fa-solid fa-eye"></i>';
+      btn.title = isHidden ? 'Show balance' : 'Hide balance';
+      btn.classList.toggle('hidden-balance', isHidden);
+    }
   },
 
   // ===== TOAST =====
@@ -281,7 +329,7 @@ const App = {
         <div class="sidebar-brand">
           <div class="sidebar-logo"><img src="assets/logo.svg" style="width:26px;height:26px;filter:brightness(0) invert(1);"></div>
           <div>
-            <div class="sidebar-brand-name">Codeherence</div>
+            <div class="sidebar-brand-name">DWK</div>
             <div class="sidebar-brand-sub">Secure Banking</div>
           </div>
         </div>
@@ -425,7 +473,37 @@ const App = {
             </div>
           </div>
           <div class="divider"></div>
+          <button class="btn btn-secondary btn-full" style="margin-bottom:8px" onclick="App.closeModal();App.showAccessibilityModal()"><i class="fa-solid fa-universal-access"></i>Accessibility</button>
           <button class="btn btn-danger btn-full" onclick="App.closeModal();App.logout()"><i class="fa-solid fa-right-from-bracket"></i>Sign Out</button>
+        </div>
+      </div>`);
+  },
+
+  showAccessibilityModal() {
+    const a = App.state.accessibility;
+    App.openModal(`
+      <div class="modal">
+        <div class="modal-header">
+          <div class="modal-title"><i class="fa-solid fa-universal-access" style="color:var(--accent);margin-right:8px"></i>Accessibility</div>
+          <button class="modal-close" id="modal-close-btn"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="modal-body">
+          <div class="settings-row">
+            <div class="settings-row-info"><div class="settings-row-title">Text Size</div><div class="settings-row-desc">Increase text size for easier reading</div></div>
+            <select class="form-control" style="width:120px" onchange="App.setAccessibility('fontSize',this.value)">
+              <option value="normal" ${a.fontSize==='normal'?'selected':''}>Normal</option>
+              <option value="large" ${a.fontSize==='large'?'selected':''}>Large</option>
+              <option value="xlarge" ${a.fontSize==='xlarge'?'selected':''}>Extra Large</option>
+            </select>
+          </div>
+          <div class="settings-row">
+            <div class="settings-row-info"><div class="settings-row-title">High Contrast</div><div class="settings-row-desc">Enhance colour contrast for visibility</div></div>
+            <label class="toggle"><input type="checkbox" ${a.highContrast?'checked':''} onchange="App.setAccessibility('highContrast',this.checked)"><span class="toggle-slider"></span></label>
+          </div>
+          <div class="settings-row">
+            <div class="settings-row-info"><div class="settings-row-title">Reduced Motion</div><div class="settings-row-desc">Disable animations and transitions</div></div>
+            <label class="toggle"><input type="checkbox" ${a.reducedMotion?'checked':''} onchange="App.setAccessibility('reducedMotion',this.checked)"><span class="toggle-slider"></span></label>
+          </div>
         </div>
       </div>`);
   },

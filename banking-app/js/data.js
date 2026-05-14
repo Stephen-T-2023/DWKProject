@@ -4,10 +4,10 @@ const Data = {
     { id:'C001', name:'Sarah Mitchell', role:'customer', email:'sarah@email.com', faId:'FA001', initials:'SM', color:'#0066FF', phone:'+44 7700 900123' },
     { id:'C002', name:'James Thompson', role:'customer', email:'james@email.com', faId:'FA001', initials:'JT', color:'#8B5CF6', phone:'+44 7700 900456' },
     { id:'C003', name:'Emma Clarke', role:'customer', email:'emma@email.com', faId:'FA002', initials:'EC', color:'#22C55E', phone:'+44 7700 900789' },
-    { id:'FA001', name:'David Chen', role:'fa', email:'david@codeherence.com', tlId:'TL001', initials:'DC', color:'#F59E0B', phone:'+44 7700 900321', specialty:'Retail Banking', cases:12, closedCases:8, rating:4.8 },
-    { id:'FA002', name:'Emily Williams', role:'fa', email:'emily@codeherence.com', tlId:'TL001', initials:'EW', color:'#EF4444', phone:'+44 7700 900654', specialty:'Investments', cases:9, closedCases:7, rating:4.6 },
-    { id:'FA003', name:'Marcus Johnson', role:'fa', email:'marcus@codeherence.com', tlId:'TL001', initials:'MJ', color:'#3B82F6', phone:'+44 7700 900987', specialty:'Mortgages', cases:15, closedCases:11, rating:4.7 },
-    { id:'TL001', name:'Robert Anderson', role:'teamleader', email:'robert@codeherence.com', initials:'RA', color:'#0A2540', phone:'+44 7700 900111' },
+    { id:'FA001', name:'David Chen', role:'fa', email:'david@dwk.com', tlId:'TL001', initials:'DC', color:'#F59E0B', phone:'+44 7700 900321', specialty:'Retail Banking', cases:12, closedCases:8, rating:4.8 },
+    { id:'FA002', name:'Emily Williams', role:'fa', email:'emily@dwk.com', tlId:'TL001', initials:'EW', color:'#EF4444', phone:'+44 7700 900654', specialty:'Investments', cases:9, closedCases:7, rating:4.6 },
+    { id:'FA003', name:'Marcus Johnson', role:'fa', email:'marcus@dwk.com', tlId:'TL001', initials:'MJ', color:'#3B82F6', phone:'+44 7700 900987', specialty:'Mortgages', cases:15, closedCases:11, rating:4.7 },
+    { id:'TL001', name:'Robert Anderson', role:'teamleader', email:'robert@dwk.com', initials:'RA', color:'#0A2540', phone:'+44 7700 900111' },
   ],
 
   accounts: [
@@ -20,7 +20,7 @@ const Data = {
 
   transactions: [
     { id:'T001', accountId:'ACC001', name:'Tesco Superstore', category:'Groceries', amount:-67.43, date:'2026-05-12', type:'debit', icon:'🛒', hidden:false },
-    { id:'T002', accountId:'ACC001', name:'Salary — Codeherence', category:'Income', amount:3200.00, date:'2026-05-01', type:'credit', icon:'💼', hidden:false },
+    { id:'T002', accountId:'ACC001', name:'Salary — DWK', category:'Income', amount:3200.00, date:'2026-05-01', type:'credit', icon:'💼', hidden:false },
     { id:'T003', accountId:'ACC001', name:'Netflix', category:'Entertainment', amount:-15.99, date:'2026-05-10', type:'debit', icon:'🎬', hidden:true },
     { id:'T004', accountId:'ACC001', name:'Gym Membership', category:'Health', amount:-45.00, date:'2026-05-08', type:'debit', icon:'🏋️', hidden:false },
     { id:'T005', accountId:'ACC001', name:'Costa Coffee', category:'Dining', amount:-4.85, date:'2026-05-11', type:'debit', icon:'☕', hidden:false },
@@ -88,12 +88,12 @@ const Data = {
   ],
 
   news: [
-    { id:'N001', category:'Markets', title:'FTSE 100 Hits New Record High Amid Rate Cut Optimism', preview:'The FTSE 100 index surged past 8,500 points today as investors grew increasingly confident that the Bank of England will begin cutting rates in June.', emoji:'📈', time:'2h ago', source:'Codeherence Market Watch' },
+    { id:'N001', category:'Markets', title:'FTSE 100 Hits New Record High Amid Rate Cut Optimism', preview:'The FTSE 100 index surged past 8,500 points today as investors grew increasingly confident that the Bank of England will begin cutting rates in June.', emoji:'📈', time:'2h ago', source:'DWK Market Watch' },
     { id:'N002', category:'Personal Finance', title:'New ISA Rules for 2026-27: What You Need to Know', preview:'The government has confirmed changes to ISA allowances and new "Flexible ISA" regulations coming into effect this April.', emoji:'💷', time:'5h ago', source:'Finance Insider' },
     { id:'N003', category:'Mortgages', title:'Average UK House Price Falls 1.2% — Is Now the Time to Buy?', preview:'Halifax reports a modest monthly decline, with experts split on whether this marks a sustained correction or a seasonal dip.', emoji:'🏠', time:'1d ago', source:'Property Weekly' },
     { id:'N004', category:'Technology', title:'Open Banking Adoption Hits 10 Million Users in the UK', preview:'The Financial Conduct Authority reports a milestone in open banking, with consumers increasingly using third-party apps for financial management.', emoji:'🔗', time:'2d ago', source:'FCA Insight' },
     { id:'N005', category:'Economy', title:'UK Inflation Drops to 2.1% — Lowest Since 2021', preview:'ONS data shows consumer price inflation easing closer to the 2% target, boosting household purchasing power and consumer confidence.', emoji:'📊', time:'3d ago', source:'ONS Bulletin' },
-    { id:'N006', category:'Savings', title:'High-Street Banks Slash Savings Rates After Base Rate Speculation', preview:"Several major lenders have reduced easy-access savings rates this week. Codeherence's Savings ISA remains unchanged at 4.75% AER.", emoji:'🏦', time:'4d ago', source:'Money Saving Expert' },
+    { id:'N006', category:'Savings', title:'High-Street Banks Slash Savings Rates After Base Rate Speculation', preview:"Several major lenders have reduced easy-access savings rates this week. DWK's Savings ISA remains unchanged at 4.75% AER.", emoji:'🏦', time:'4d ago', source:'Money Saving Expert' },
   ],
 
   faqs: [
